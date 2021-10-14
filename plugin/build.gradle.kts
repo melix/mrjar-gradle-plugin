@@ -2,6 +2,7 @@ plugins {
     `java-gradle-plugin`
     `java-test-fixtures`
     groovy
+    id("com.gradle.plugin-publish") version "0.16.0"
 }
 
 java {
@@ -20,6 +21,19 @@ gradlePlugin {
     val mrjar by plugins.creating {
         id = "me.champeau.mrjar"
         implementationClass = "me.champeau.mrjar.MultiReleaseJarPlugin"
+    }
+}
+
+pluginBundle {
+    website = "https://melix.github.io/gradle-mrjar-plugin/"
+    vcsUrl = "https://github.com/melix/gradle-mrjar-plugin"
+    description = "Adds support for building multi-release jars with Gradle"
+    tags = listOf("mrjar", "multi-release")
+
+    plugins {
+        named("mrjar") {
+            displayName = "Gradle Multi-Release JAR plugin"
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 [versions]
-mrjar = "0.1"
+mrjar = "0.1.1-SNAPSHOT"
 spock = "2.0-groovy-3.0"
 groovy = "3.0.9"
 

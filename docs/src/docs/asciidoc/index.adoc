@@ -1,0 +1,122 @@
+= Multi-release JAR Gradle plugin
+Cédric Champeau
+
+This plugin adds support for building and testing multi-release jars with Gradle.
+It leverages the link:https://docs.gradle.org/current/userguide/toolchains.html[toolchain support] to compile, test and run your application on the appropriate target JVMs.
+
+This plugin has been successfully tested on Gradle {tested-versions}.
+Earlier releases are not supported.
+
+NOTE: Before using multi-release jars, you should double check that they are the right solution for your problem. Multi-release jars are a good solution when you want to support different runtimes, all having the same set of dependencies. In general, this should be limited to cases where you want to provide a dedicated implementation of a specific class for a particular Java runtime version, without having to use reflection to load it dynamically. Other use cases should be taken with a grain of salt. See https://blog.gradle.org/mrjars
+
+== Usage
+
+.Applying the plugin
+[role="multi-language-sample",subs="attributes+"]
+```groovy
+include::../../../../samples/basic/groovy/build.gradle[tag=plugin_use]
+```
+
+[role="multi-language-sample",subs="attributes+"]
+```kotlin
+include::../../../../samples/basic/kotlin/build.gradle.kts[tag=plugin_use]
+```
+
+The plugin will expose an extension called `multiRelease` which can be used to configure a number of source sets:
+
+.Declaring versions
+[role="multi-language-sample",subs="attributes+"]
+```groovy
+include::../../../../samples/basic/groovy/build.gradle[tag=declaring_versions]
+```
+
+[role="multi-language-sample",subs="attributes+"]
+```kotlin
+include::../../../../samples/basic/kotlin/build.gradle.kts[tag=declaring_versions]
+```
+
+The first version of the list is the version of the main source set. The code above will then automatically:
+
+- configure the main source set to use Java 8
+- create an additional source set `src/main/java11` for Java 11 specific classes
+- create an additional source set `src/test/java11` for Java 11 specific test classes
+
+The main source set will be compiled using a _Java 8_ toolchain, while the _Java 11_ source set will be compiled using a _Java 11_ toolchain.
+There are advantages of doing do:
+
+- JDK specific APIs are only visible to the appropriate source sets
+- each source set can use JDK specific language features
+- no need to use `bootclasspath` tricks
+
+== Organization of sources
+
+The main source set, `src/main/java`, is always compiled first.
+You can see it as the "shared" source sets, where all the common classes live.
+All additional source sets created by this plugin will automatically "see" the classes of the main source set.
+
+For example, the following layout is valid:
+
+```
+src
+ |-- main
+      |-- java
+           |-- org/my/company/SharedClass.java
+           |-- org/my/company/Substituted.java
+      |-- java11
+           |-- org/my/company/Substituted.java
+```
+
+The `Substituted` class requires `SharedClass` at compile time, but you don't have to duplicate the code: it will automatically be visible when Gradle will compile the Java 11 version.
+
+== Testing
+
+One of the challenges of multi-release jars is testing.
+This plugin provides support for testing in a similar way it does for compilation:
+
+- for each target language version, a `src/test/javaXXX` source set is created
+- each language specific source set can see the classes from the main source set
+- each source set can provide tests which are specific to the language version it is testing
+- each source set can provide test classes which override tests from the main test sources
+
+For example, the following layout is permitted:
+
+```
+src
+ |-- test
+      |-- java
+           |-- org/my/company/CommonTests.java
+           |-- org/my/company/SubstitutedTests.java
+      |-- java11
+           |-- org/my/company/SubstitutedTests.java
+           |-- org/my/company/VersionSpecificTests.java
+```
+
+When executing the task `java11Test`, the following test cases will be executed:
+
+- `CommonTests` from the main tests
+- `SubstitutedTests` from the `java11` source set
+- `VersionSpecificTests` from the `java11` source set
+
+== Running on different JDKs
+
+Eventually, if you also apply the `application` plugin, this plugin will create additional `run` tasks preconfigured for each language level.
+
+For example, you select target languages 8, 11 and 17, the plugin will:
+
+- configure the `run` task to use Java 8
+- configure a `java11Run` task to run with Java 11
+- configure a `java17Run` task to run with Java 17
+
+== Version specific dependencies
+
+You can have dependencies specific to a version of Java.
+For example, for the `java11` source set, it is possible to add a dependency only used to compile the sources found in `src/test/java11`:
+
+.A source set specific dependency
+```groovy
+dependencies {
+    java11TestImplementation("my:library:1.0")
+}
+```
+
+WARNING: Source set specific dependencies on **production code** (tests are fine) are a strong indication that a multi-release jar is the wrong abstraction. By definition, a multi-release jar is a single deliverable targetting different platforms _at runtime_. Because you don't know what the runtime will be, it means that all downstream consumers will bring the transitive dependencies _even if they don't need them_. Therefore, if you have version specific dependencies, it's a better idea to use Gradle's variant-aware dependency management mechanism to provide different deliverables _per release_ (eg. `mylib-java8.jar` and `mylib-java11.jar`), because the consumers would only get the dependencies they care about.

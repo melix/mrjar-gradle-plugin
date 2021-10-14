@@ -1,0 +1,8 @@
+[versions]
+mrjar = "0.1-SNAPSHOT"
+spock = "2.0-groovy-3.0"
+groovy = "3.0.9"
+
+[libraries]
+groovy = { module = "org.codehaus.groovy:groovy", version.ref = "groovy"}
+test-spock = { module = "org.spockframework:spock-core", version.ref = "spock" }

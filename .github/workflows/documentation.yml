@@ -1,0 +1,41 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  generate_documentation:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          ssh-key: "${{ secrets.SSH_PRIVATE_KEY }}"
+      - name: Setup git
+        env:
+          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+          SSH_PRIVATE_KEY: "${{ secrets.SSH_PRIVATE_KEY }}"
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 700 -R ~/.ssh
+          eval "$(ssh-agent -s)"
+          ssh-add
+          ssh git@github.com || true
+          git config --global user.name 'GitHub bot'
+          git config --global user.email 'melix@users.noreply.github.com'
+      - name: Get GraalVM Nightly
+        run: |
+          SCRIPT="$PWD/common/scripts/downloadGraalVM.sh"
+          pushd ~
+          source $SCRIPT
+          echo "$GRAALVM_HOME/bin" >> $GITHUB_PATH
+          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          echo "GRAALVM_HOME=$GRAALVM_HOME" >> $GITHUB_ENV
+          popd
+      - name: Build and publish documentation
+        run: |
+          echo "org.ajoberstar.grgit.auth.command.allow=true" >> gradle.properties
+          ./gradlew :docs:gitPublishPush

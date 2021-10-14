@@ -25,3 +25,7 @@ tasks {
         ))
     }
 }
+
+gitPublish {
+    repoUri.set("git@github.com:melix/gradle-mrjar-plugin.git")
+}

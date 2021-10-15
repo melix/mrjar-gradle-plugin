@@ -30,8 +30,8 @@ gradlePlugin {
 
 afterEvaluate {
     pluginBundle {
-        website = "https://melix.github.io/gradle-mrjar-plugin/"
-        vcsUrl = "https://github.com/melix/gradle-mrjar-plugin"
+        website = "https://melix.github.io/mrjar-gradle-plugin/"
+        vcsUrl = "https://github.com/melix/mrjar-gradle-plugin"
         description = "Adds support for building multi-release jars with Gradle"
         tags = listOf("mrjar", "multi-release")
 

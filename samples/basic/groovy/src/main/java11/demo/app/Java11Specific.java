@@ -1,7 +1,7 @@
 package demo.app;
 
-public class Version {
+public class Java11Specific {
     public static String getMessage() {
-        return Java11Specific.getMessage();
+        return "Java 11 version";
     }
 }

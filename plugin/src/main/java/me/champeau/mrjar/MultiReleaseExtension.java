@@ -77,18 +77,27 @@ public abstract class MultiReleaseExtension {
         this.extensions = extensions;
     }
 
-    public void targetVersions(int defaultVersion, int... versions) {
+
+    public void targetVersions(String mainSourceDirectory, String testSourceDirectory, int defaultVersion, int... versions) {
         defaultLanguageVersion(defaultVersion);
         for (int version : versions) {
-            addLanguageVersion(version);
+            addLanguageVersion(version, mainSourceDirectory, testSourceDirectory);
         }
     }
 
-    private void addLanguageVersion(int version) {
+    public void targetVersions(int defaultVersion, int... versions) {
+        targetVersions("src/main/", "src/test/", defaultVersion, versions);
+    }
+
+    public void targetVersions(String sourceDirectory, int defaultVersion, int... versions) {
+        targetVersions(sourceDirectory + "main/", sourceDirectory + "test/", defaultVersion, versions);
+    }
+
+    private void addLanguageVersion(int version, String mainSourceDirectory, String testSourceDirectory) {
         String javaX = "java" + version;
         // First, let's create a source set for this language version
-        SourceSet langSourceSet = sourceSets.create(javaX, srcSet -> srcSet.getJava().srcDir("src/main/" + javaX));
-        SourceSet testSourceSet = sourceSets.create(javaX + "Test", srcSet -> srcSet.getJava().srcDir("src/test/" + javaX));
+        SourceSet langSourceSet = sourceSets.create(javaX, srcSet -> srcSet.getJava().srcDir(mainSourceDirectory + javaX));
+        SourceSet testSourceSet = sourceSets.create(javaX + "Test", srcSet -> srcSet.getJava().srcDir(testSourceDirectory + javaX));
         SourceSet sharedSourceSet = sourceSets.findByName(SourceSet.MAIN_SOURCE_SET_NAME);
         SourceSet sharedTestSourceSet = sourceSets.findByName(SourceSet.TEST_SOURCE_SET_NAME);
 

@@ -8,4 +8,9 @@ class FixedMessageTest {
         String message = Version.getMessage();
         assertEquals("Java 11 version", message);
     }
+
+    @Test void canCallVersionSpecificCode() {
+        String message = Java11Specific.getMessage();
+        assertEquals("Java 11 version", message);
+    }
 }

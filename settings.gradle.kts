@@ -2,12 +2,14 @@ pluginManagement {
     includeBuild("build-logic")
 }
 
+plugins {
+  id("org.gradle.toolchains.foojay-resolver-convention") version "0.7.0"
+}
+
 rootProject.name = "gradle-mrjar-plugin"
 
 include("plugin")
 include("docs")
-
-enableFeaturePreview("VERSION_CATALOGS")
 
 dependencyResolutionManagement {
     repositories {
@@ -18,9 +20,10 @@ dependencyResolutionManagement {
 gradle.beforeProject {
     extra.set("supportedGradleVersions", setOf(
             "", // current,
-            "7.1.1",
-            "7.2",
-            "7.3-rc-1"
+            "7.3",
+            "7.5",
+            "7.6",
+            "8.4-rc-3"
     ))
 }
 gradle.afterProject {

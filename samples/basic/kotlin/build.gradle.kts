@@ -24,10 +24,10 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class) {
+            useJUnitJupiter("5.8.1")
+        }
+    }
 }

@@ -73,7 +73,7 @@ The `Substituted` class requires `SharedClass` at compile time, but you don't ha
 One of the challenges of multi-release jars is testing.
 This plugin provides support for testing in a similar way it does for compilation:
 
-- for each target language version, a `src/test/javaXXX` source set is created
+- for each target language version, a `src/test/javaXXX` source set is created with the link:https://docs.gradle.org/current/userguide/jvm_test_suite_plugin.html#jvm_test_suite_plugin[JVM Test Plugin]
 - each language specific source set can see the classes from the main source set
 - each source set can provide tests which are specific to the language version it is testing
 - each source set can provide test classes which override tests from the main test sources
@@ -107,12 +107,61 @@ For example, you select target languages 8, 11 and 17, the plugin will:
 - configure a `java11Run` task to run with Java 11
 - configure a `java17Run` task to run with Java 17
 
+== Sharing test configurations
+
+You can easily configure the test of all Java versions using the link:https://docs.gradle.org/current/dsl/org.gradle.testing.base.TestingExtension.html[TestingExtension]:
+
+.Confifure tests of all Java versions
+[role="multi-language-sample",subs="attributes+"]
+```groovy
+testing {
+     suites {
+          configureEach {
+               useJUnitJupiter()
+               dependencies {
+                    implementation('org.mockito:mockito-junit-jupiter:4.6.1')
+               }
+          }
+     }
+}
+```
+
+[role="multi-language-sample",subs="attributes+"]
+```kotlin
+testing {
+     suites {
+          configureEach {
+               if (this is JvmTestSuite) {
+                    useJUnitJupiter()
+                    dependencies {
+                         implementation("org.mockito:mockito-junit-jupiter:4.6.1")
+                    }
+               }
+          }
+     }
+}
+```
+
 == Version specific dependencies
 
 You can have dependencies specific to a version of Java.
 For example, for the `java11` source set, it is possible to add a dependency only used to compile the sources found in `src/test/java11`:
 
 .A source set specific dependency
+```groovy
+testing {
+     suites {
+          java11Test {
+               dependencies {
+                    implementation("my:library:1.0)
+               }
+          }
+     }
+}
+```
+
+Or its equivalent without the `testing` extension:
+
 ```groovy
 dependencies {
     java11TestImplementation("my:library:1.0")

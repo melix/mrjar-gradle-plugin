@@ -28,21 +28,23 @@ import org.gradle.api.plugins.ExtensionContainer;
 import org.gradle.api.plugins.JavaApplication;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.plugins.PluginManager;
+import org.gradle.api.plugins.jvm.JvmTestSuite;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.JavaExec;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskContainer;
-import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.api.tasks.compile.JavaCompile;
-import org.gradle.api.tasks.testing.Test;
 import org.gradle.jvm.toolchain.JavaCompiler;
 import org.gradle.jvm.toolchain.JavaLanguageVersion;
 import org.gradle.jvm.toolchain.JavaLauncher;
 import org.gradle.jvm.toolchain.JavaToolchainService;
 import org.gradle.language.base.plugins.LifecycleBasePlugin;
+import org.gradle.testing.base.TestingExtension;
+import org.gradle.util.GradleVersion;
 
+import java.util.Arrays;
 import javax.inject.Inject;
 
 public abstract class MultiReleaseExtension {
@@ -97,7 +99,6 @@ public abstract class MultiReleaseExtension {
         String javaX = "java" + version;
         // First, let's create a source set for this language version
         SourceSet langSourceSet = sourceSets.create(javaX, srcSet -> srcSet.getJava().srcDir(mainSourceDirectory + javaX));
-        SourceSet testSourceSet = sourceSets.create(javaX + "Test", srcSet -> srcSet.getJava().srcDir(testSourceDirectory + javaX));
         SourceSet sharedSourceSet = sourceSets.findByName(SourceSet.MAIN_SOURCE_SET_NAME);
         SourceSet sharedTestSourceSet = sourceSets.findByName(SourceSet.TEST_SOURCE_SET_NAME);
 
@@ -115,47 +116,73 @@ public abstract class MultiReleaseExtension {
         tasks.named(langSourceSet.getCompileJavaTaskName(), JavaCompile.class, task ->
                 task.getJavaCompiler().convention(targetCompiler)
         );
-        tasks.named(testSourceSet.getCompileJavaTaskName(), JavaCompile.class, task ->
-                task.getJavaCompiler().convention(targetCompiler)
-        );
 
         // let's make sure to create a "test" task
         Provider<JavaLauncher> targetLauncher = javaToolchains.launcherFor(spec -> spec.getLanguageVersion().convention(JavaLanguageVersion.of(version)));
+        TestingExtension testing = this.extensions.getByType(TestingExtension.class);
 
-        Configuration testImplementation = configurations.getByName(testSourceSet.getImplementationConfigurationName());
-        testImplementation.extendsFrom(configurations.getByName(sharedTestSourceSet.getImplementationConfigurationName()));
-        Configuration testCompileOnly = configurations.getByName(testSourceSet.getCompileOnlyConfigurationName());
-        testCompileOnly.extendsFrom(configurations.getByName(sharedTestSourceSet.getCompileOnlyConfigurationName()));
-        testCompileOnly.getDependencies().add(dependencies.create(langSourceSet.getOutput().getClassesDirs()));
-        testCompileOnly.getDependencies().add(dependencies.create(sharedSourceSet.getOutput().getClassesDirs()));
+        testing.getSuites().register("java" + version + "Test", JvmTestSuite.class, suite -> {
+            suite.sources(sources ->
+                sources.java(java ->
+                    java.setSrcDirs(Arrays.asList(testSourceDirectory.concat(javaX)))
+                )
+            );
+            this.tasks.named(
+                suite.getSources().getCompileJavaTaskName(),
+                JavaCompile.class,
+                task -> task.getJavaCompiler().convention(targetCompiler)
+            );
 
-        Configuration testRuntimeClasspath = configurations.getByName(testSourceSet.getRuntimeClasspathConfigurationName());
-        // so here's the deal. MRjars are JARs! Which means that to execute tests, we need
-        // the JAR on classpath, not just classes + resources as Gradle usually does
-        testRuntimeClasspath.getAttributes()
-                .attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.class, LibraryElements.JAR));
+            if (GradleVersion.current().compareTo(GradleVersion.version("7.6")) >= 0) {
+                suite.dependencies(deps -> {
+                    deps.getImplementation().add(deps.project());
+                    deps.getCompileOnly().add(dependencies.create(langSourceSet.getOutput().getClassesDirs()));
+                    deps.getCompileOnly().add(dependencies.create(sharedSourceSet.getOutput().getClassesDirs()));
+                });
+            } else {
+                Configuration testImplementation = configurations.getByName(suite.getSources().getImplementationConfigurationName());
+                Configuration testCompileOnly = configurations.getByName(suite.getSources().getCompileOnlyConfigurationName());
 
-        TaskProvider<Test> testTask = tasks.register("java" + version + "Test", Test.class, test -> {
-            test.setGroup(LifecycleBasePlugin.VERIFICATION_GROUP);
-            test.getJavaLauncher().convention(targetLauncher);
+                testImplementation.extendsFrom(configurations.getByName(sharedTestSourceSet.getImplementationConfigurationName()));
+                testCompileOnly.extendsFrom(configurations.getByName(sharedTestSourceSet.getCompileOnlyConfigurationName()));
+                testCompileOnly.getDependencies().add(dependencies.create(langSourceSet.getOutput().getClassesDirs()));
+                testCompileOnly.getDependencies().add(dependencies.create(sharedSourceSet.getOutput().getClassesDirs()));
+            }
 
-            ConfigurableFileCollection testClassesDirs = objects.fileCollection();
-            testClassesDirs.from(testSourceSet.getOutput());
-            testClassesDirs.from(sharedTestSourceSet.getOutput());
-            test.setTestClassesDirs(testClassesDirs);
-            ConfigurableFileCollection classpath = objects.fileCollection();
-            // must put the MRJar first on classpath
-            classpath.from(tasks.named("jar"));
-            // then we put the specific test sourceset tests, so that we can override
-            // the shared versions
-            classpath.from(testSourceSet.getOutput());
+            // so here's the deal. MRjars are JARs! Which means that to execute tests, we need
+            // the JAR on classpath, not just classes + resources as Gradle usually does
+            configurations
+                .getByName(suite.getSources().getRuntimeClasspathConfigurationName())
+                .getAttributes()
+                .attribute(
+                    LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+                    objects.named(LibraryElements.class, LibraryElements.JAR)
+                );
 
-            // then we add the shared tests
-            classpath.from(sharedTestSourceSet.getRuntimeClasspath());
-            test.setClasspath(classpath);
+            suite.getTargets().configureEach(target ->
+                target.getTestTask().configure(task -> {
+                    task.setGroup(LifecycleBasePlugin.VERIFICATION_GROUP);
+                    task.getJavaLauncher().convention(targetLauncher);
+
+                    ConfigurableFileCollection testClassesDirs = objects.fileCollection();
+                    testClassesDirs.from(suite.getSources().getOutput());
+                    testClassesDirs.from(sharedTestSourceSet.getOutput());
+                    task.setTestClassesDirs(testClassesDirs);
+                    ConfigurableFileCollection classpath = objects.fileCollection();
+                    // must put the MRJar first on classpath
+                    classpath.from(tasks.named("jar"));
+                    // then we put the specific test sourceset tests, so that we can override
+                    // the shared versions
+                    classpath.from(suite.getSources().getOutput());
+
+                    // then we add the shared tests
+                    classpath.from(sharedTestSourceSet.getRuntimeClasspath());
+                    task.setClasspath(classpath);
+                })
+            );
         });
 
-        tasks.named("check", task -> task.dependsOn(testTask));
+        tasks.named("check", task -> task.dependsOn(testing.getSuites().named(javaX.concat("Test"))));
 
         configureMrJar(version, langSourceSet);
 

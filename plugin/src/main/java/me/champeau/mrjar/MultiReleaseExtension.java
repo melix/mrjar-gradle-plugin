@@ -47,7 +47,7 @@ import org.gradle.util.GradleVersion;
 import java.util.Arrays;
 import javax.inject.Inject;
 
-public class MultiReleaseExtension {
+public abstract class MultiReleaseExtension {
     private final JavaPluginExtension javaPluginExtension;
     private final TaskContainer tasks;
     private final SourceSetContainer sourceSets;

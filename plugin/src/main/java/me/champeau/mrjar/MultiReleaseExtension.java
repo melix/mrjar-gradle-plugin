@@ -101,6 +101,17 @@ public abstract class MultiReleaseExtension {
         SourceSet sharedSourceSet = sourceSets.findByName(SourceSet.MAIN_SOURCE_SET_NAME);
         SourceSet sharedTestSourceSet = sourceSets.findByName(SourceSet.TEST_SOURCE_SET_NAME);
 
+        // Any javaX configuration should extend from its shared configuration
+        configurations.matching(config -> config.getName().startsWith(javaX)).configureEach(specific -> {
+            String noPrefix = specific.getName().replace(javaX, "");
+            String sharedName = noPrefix.substring(0, 1).toLowerCase().concat(noPrefix.substring(1));
+            Configuration sharedConfig = configurations.findByName(sharedName);
+
+            if (sharedConfig != null) {
+                specific.extendsFrom(sharedConfig);
+            }
+        });
+
         // This is only necessary because in real life, we have dependencies between classes
         // and what you're likely to want to do, is to provide a JDK 9 specific class, which depends on common
         // classes of the main source set. In other words, you want to override some specific classes, but they
@@ -122,10 +133,7 @@ public abstract class MultiReleaseExtension {
         // let's make sure to create a "test" task
         Provider<JavaLauncher> targetLauncher = javaToolchains.launcherFor(spec -> spec.getLanguageVersion().convention(JavaLanguageVersion.of(version)));
 
-        Configuration testImplementation = configurations.getByName(testSourceSet.getImplementationConfigurationName());
-        testImplementation.extendsFrom(configurations.getByName(sharedTestSourceSet.getImplementationConfigurationName()));
         Configuration testCompileOnly = configurations.getByName(testSourceSet.getCompileOnlyConfigurationName());
-        testCompileOnly.extendsFrom(configurations.getByName(sharedTestSourceSet.getCompileOnlyConfigurationName()));
         testCompileOnly.getDependencies().add(dependencies.create(langSourceSet.getOutput().getClassesDirs()));
         testCompileOnly.getDependencies().add(dependencies.create(sharedSourceSet.getOutput().getClassesDirs()));
 

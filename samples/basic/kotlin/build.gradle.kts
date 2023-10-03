@@ -25,6 +25,10 @@ repositories {
 }
 
 dependencies {
+    compileOnly("org.projectlombok:lombok:1.18.30")
+	annotationProcessor("org.projectlombok:lombok:1.18.30")
+    implementation("org.apache.commons:commons-lang3:3.13.0")
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
 }
 
